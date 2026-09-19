@@ -111,21 +111,28 @@ export const SchoolManagerModal: React.FC<SchoolManagerModalProps> = ({
 
   // Update Assignment
   const handleUpdateAssignment = (
-    classId: string,
-    subjectCode: string,
+    indexInClass: number,
     field: 'periodsPerWeek' | 'teacherName',
     value: any
   ) => {
     setProfile(prev => {
-      const copy = { ...prev };
-      const idx = copy.assignments.findIndex(a => a.classId === classId && a.subjectCode === subjectCode);
-      if (idx >= 0) {
-        copy.assignments[idx] = {
-          ...copy.assignments[idx],
-          [field]: value,
-        };
-      }
-      return copy;
+      let count = 0;
+      return {
+        ...prev,
+        assignments: prev.assignments.map(a => {
+          if (a.classId === selectedClassId) {
+            const isTarget = count === indexInClass;
+            count++;
+            if (isTarget) {
+              return {
+                ...a,
+                [field]: value,
+              };
+            }
+          }
+          return a;
+        }),
+      };
     });
   };
 
@@ -152,11 +159,21 @@ export const SchoolManagerModal: React.FC<SchoolManagerModalProps> = ({
   };
 
   // Remove Assignment
-  const handleRemoveAssignment = (classId: string, subjectCode: string) => {
-    setProfile(prev => ({
-      ...prev,
-      assignments: prev.assignments.filter(a => !(a.classId === classId && a.subjectCode === subjectCode)),
-    }));
+  const handleRemoveAssignment = (indexInClass: number) => {
+    setProfile(prev => {
+      let count = 0;
+      return {
+        ...prev,
+        assignments: prev.assignments.filter(a => {
+          if (a.classId === selectedClassId) {
+            const isMatch = count === indexInClass;
+            count++;
+            return !isMatch;
+          }
+          return true;
+        }),
+      };
+    });
   };
 
   // Calculate total periods for selected class
@@ -392,7 +409,7 @@ export const SchoolManagerModal: React.FC<SchoolManagerModalProps> = ({
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {profile.teachers.map((t, idx) => (
-                        <tr key={t.id || idx} className="hover:bg-blue-50/40 transition-colors">
+                        <tr key={t.id ? `${t.id}_${idx}` : `teacher_${idx}`} className="hover:bg-blue-50/40 transition-colors">
                           <td className="py-2 px-3 font-semibold text-slate-900 flex items-center gap-2">
                             <span
                               className="w-3 h-3 rounded-full inline-block shrink-0"
@@ -534,10 +551,10 @@ export const SchoolManagerModal: React.FC<SchoolManagerModalProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {classAssignments.map(a => {
+                      {classAssignments.map((a, aIdx) => {
                         const subj = SUBJECTS[a.subjectCode as keyof typeof SUBJECTS];
                         return (
-                          <tr key={a.subjectCode} className="hover:bg-slate-50 transition-colors">
+                          <tr key={`${selectedClassId}_${a.subjectCode}_${a.teacherName}_${aIdx}`} className="hover:bg-slate-50 transition-colors">
                             <td className="py-2 px-3">
                               <span className="font-semibold text-slate-900">{subj?.name || a.subjectCode}</span>
                               <span className="text-[10px] text-slate-500 ml-1.5">({a.subjectCode})</span>
@@ -551,8 +568,7 @@ export const SchoolManagerModal: React.FC<SchoolManagerModalProps> = ({
                                   value={a.periodsPerWeek}
                                   onChange={e =>
                                     handleUpdateAssignment(
-                                      selectedClassId,
-                                      a.subjectCode,
+                                      aIdx,
                                       'periodsPerWeek',
                                       parseInt(e.target.value) || 1
                                     )
@@ -567,16 +583,15 @@ export const SchoolManagerModal: React.FC<SchoolManagerModalProps> = ({
                                 value={a.teacherName}
                                 onChange={e =>
                                   handleUpdateAssignment(
-                                    selectedClassId,
-                                    a.subjectCode,
+                                    aIdx,
                                     'teacherName',
                                     e.target.value
                                   )
                                 }
                                 className="w-full max-w-[200px] px-2 py-1 rounded border border-slate-300 text-xs font-medium text-slate-800 bg-white"
                               >
-                                {profile.teachers.map(t => (
-                                  <option key={t.name} value={t.name}>
+                                {profile.teachers.map((t, tIdx) => (
+                                  <option key={`${t.id || t.name}_${tIdx}`} value={t.name}>
                                     {t.name} {t.role === 'GVCN' ? `(GVCN ${t.assignedClass || ''})` : `(${t.subjects?.join(',')})`}
                                   </option>
                                 ))}
@@ -588,7 +603,7 @@ export const SchoolManagerModal: React.FC<SchoolManagerModalProps> = ({
                                 <span className="text-[10px] text-slate-400 font-semibold">Cố định</span>
                               ) : (
                                 <button
-                                  onClick={() => handleRemoveAssignment(selectedClassId, a.subjectCode)}
+                                  onClick={() => handleRemoveAssignment(aIdx)}
                                   className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
                                   title="Xóa phân môn này"
                                 >
